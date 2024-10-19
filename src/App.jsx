@@ -3,7 +3,6 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 function App() {
-  const [file, setFile] = useState(null);
   const [data, setData] = useState([]);
 
   const handleFileChange = (e) => {
@@ -24,50 +23,123 @@ function App() {
   const processExcelData = (jsonData) => {
     const formattedData = [];
     let currentName = "";
+    let totalHoursByPerson = 0;
+    let totalMinutesByPerson = 0;
+    let tasksByPerson = [];
+    let serialNo = 1;
+
     jsonData.forEach((row) => {
       const level = row[0]; // Level column
       const value = row[1]; // Users/issues/CurrentStatus column
-      const timespend = row[3]; // Time Spent column
+      const timespend = row[3];
 
       if (level === 0) {
-        // Level 0 indicates a name
-        currentName = value; // Store the current name
+        // When we encounter a new person, process the previous person's tasks
+        if (currentName) {
+          // Add a row for the total time spent by the previous person
+          const totalTime = convertToHoursAndMinutes(
+            totalHoursByPerson,
+            totalMinutesByPerson
+          );
+          formattedData.push({
+            SNo: serialNo++, // Assign serial number for each person
+            ResourceName: currentName,
+            Tasks: "", // Empty for total time row
+            TimeUtilized: totalTime,
+            Status: "",
+          });
+
+          // Add the individual tasks for the previous person
+          tasksByPerson.forEach((task) => {
+            formattedData.push({
+              SNo: "", // No serial number for tasks
+              ResourceName: "", // Empty for subsequent task rows
+              Tasks: task.Tasks,
+              TimeUtilized: task.TimeUtilized,
+              Status: task.Status,
+            });
+          });
+
+          // Add a blank row to create space between logs of different people
+          formattedData.push({
+            SNo: "",
+            ResourceName: "",
+            Tasks: "",
+            TimeUtilized: "",
+            Status: "",
+          });
+        }
+
+        // Reset for the new person
+        currentName = value;
+        totalHoursByPerson = 0;
+        totalMinutesByPerson = 0;
+        tasksByPerson = [];
       } else if (level === 1) {
         // Level 1 indicates a task
-        formattedData.push({
-          SNo: formattedData.length + 1,
-          ResourceName: currentName,
+        tasksByPerson.push({
           Tasks: value,
           TimeUtilized: timespend,
           Status: "",
         });
+
+        // Split the time into hours and minutes, then accumulate
+        const [hours, minutes] = timespend.split(":").map(Number);
+        totalHoursByPerson += hours;
+        totalMinutesByPerson += minutes;
       } else if (level === 2) {
         // Level 2 indicates the status of the task
-        if (formattedData.length > 0) {
-          formattedData[formattedData.length - 1].Status = value;
+        if (tasksByPerson.length > 0) {
+          tasksByPerson[tasksByPerson.length - 1].Status = value;
         }
       }
     });
 
+    // After the last person
+    if (currentName) {
+      const totalTime = convertToHoursAndMinutes(
+        totalHoursByPerson,
+        totalMinutesByPerson
+      );
+      formattedData.push({
+        SNo: serialNo++, // Assign serial number for the last person
+        ResourceName: currentName,
+        Tasks: "",
+        TimeUtilized: totalTime,
+        Status: "",
+      });
+
+      tasksByPerson.forEach((task) => {
+        formattedData.push({
+          SNo: "", // No serial number for tasks
+          ResourceName: "",
+          Tasks: task.Tasks,
+          TimeUtilized: task.TimeUtilized,
+          Status: task.Status,
+        });
+      });
+
+      // Add a blank row to create space between logs of different people
+      formattedData.push({
+        SNo: "",
+        ResourceName: "",
+        Tasks: "",
+        TimeUtilized: "",
+        Status: "",
+      });
+    }
+
     setData(formattedData);
   };
 
+  const convertToHoursAndMinutes = (totalHours, totalMinutes) => {
+    totalHours += Math.floor(totalMinutes / 60); // Convert minutes to hours
+    totalMinutes = totalMinutes % 60; // Keep remaining minutes
+    return `${totalHours}h ${totalMinutes}m`;
+  };
+
   const exportToExcel = () => {
-    const formattedDataForExport = data.map((item, index) => {
-      // Keep track of the previous resource name
-      let previousName = index > 0 ? data[index - 1].ResourceName : null;
-
-      return {
-        SNo: item.SNo,
-        ResourceName:
-          item.ResourceName === previousName ? "" : item.ResourceName,
-        Tasks: item.Tasks,
-        TimeUtilized: item.TimeUtilized,
-        Status: item.Status,
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(formattedDataForExport);
+    const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
     const excelBuffer = XLSX.write(workbook, {
@@ -91,7 +163,7 @@ function App() {
                 <th>S.No</th>
                 <th>Resource Name</th>
                 <th>Tasks</th>
-                <th>Time utilized</th>
+                <th>Time Utilized</th>
                 <th>Status</th>
               </tr>
             </thead>
