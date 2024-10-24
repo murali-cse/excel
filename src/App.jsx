@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 function App() {
   const [data, setData] = useState([]);
@@ -34,33 +36,29 @@ function App() {
       const timespend = row[3];
 
       if (level === 0) {
-        // When we encounter a new person, process the previous person's tasks
         if (currentName) {
-          // Add a row for the total time spent by the previous person
           const totalTime = convertToHoursAndMinutes(
             totalHoursByPerson,
             totalMinutesByPerson
           );
           formattedData.push({
-            SNo: serialNo++, // Assign serial number for each person
+            SNo: serialNo++,
             ResourceName: currentName,
-            Tasks: "", // Empty for total time row
+            Tasks: "",
             TimeUtilized: totalTime,
             Status: "",
           });
 
-          // Add the individual tasks for the previous person
           tasksByPerson.forEach((task) => {
             formattedData.push({
-              SNo: "", // No serial number for tasks
-              ResourceName: "", // Empty for subsequent task rows
+              SNo: "",
+              ResourceName: "",
               Tasks: task.Tasks,
               TimeUtilized: task.TimeUtilized,
               Status: task.Status,
             });
           });
 
-          // Add a blank row to create space between logs of different people
           formattedData.push({
             SNo: "",
             ResourceName: "",
@@ -70,39 +68,34 @@ function App() {
           });
         }
 
-        // Reset for the new person
         currentName = value;
         totalHoursByPerson = 0;
         totalMinutesByPerson = 0;
         tasksByPerson = [];
       } else if (level === 1) {
-        // Level 1 indicates a task
         tasksByPerson.push({
           Tasks: value,
           TimeUtilized: timespend,
           Status: "",
         });
 
-        // Split the time into hours and minutes, then accumulate
         const [hours, minutes] = timespend.split(":").map(Number);
         totalHoursByPerson += hours;
         totalMinutesByPerson += minutes;
       } else if (level === 2) {
-        // Level 2 indicates the status of the task
         if (tasksByPerson.length > 0) {
           tasksByPerson[tasksByPerson.length - 1].Status = value;
         }
       }
     });
 
-    // After the last person
     if (currentName) {
       const totalTime = convertToHoursAndMinutes(
         totalHoursByPerson,
         totalMinutesByPerson
       );
       formattedData.push({
-        SNo: serialNo++, // Assign serial number for the last person
+        SNo: serialNo++,
         ResourceName: currentName,
         Tasks: "",
         TimeUtilized: totalTime,
@@ -111,7 +104,7 @@ function App() {
 
       tasksByPerson.forEach((task) => {
         formattedData.push({
-          SNo: "", // No serial number for tasks
+          SNo: "",
           ResourceName: "",
           Tasks: task.Tasks,
           TimeUtilized: task.TimeUtilized,
@@ -119,7 +112,6 @@ function App() {
         });
       });
 
-      // Add a blank row to create space between logs of different people
       formattedData.push({
         SNo: "",
         ResourceName: "",
@@ -133,14 +125,22 @@ function App() {
   };
 
   const convertToHoursAndMinutes = (totalHours, totalMinutes) => {
-    totalHours += Math.floor(totalMinutes / 60); // Convert minutes to hours
-    totalMinutes = totalMinutes % 60; // Keep remaining minutes
+    totalHours += Math.floor(totalMinutes / 60);
+    totalMinutes = totalMinutes % 60;
     return `${totalHours}h ${totalMinutes}m`;
   };
 
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
+
+    data.forEach((item, index) => {
+      if (item.Tasks === "") {
+        const cellRef = XLSX.utils.encode_cell({ r: index + 1, c: 3 });
+        worksheet[cellRef].s = { font: { bold: true } };
+      }
+    });
+
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tasks");
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
@@ -150,6 +150,46 @@ function App() {
     saveAs(blob, "formatted_tasks.xlsx");
   };
 
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+
+    doc.text("Task Report", 20, 10);
+
+    const tableColumn = [
+      "S.No",
+      "Resource Name",
+      "Tasks",
+      "Time Utilized",
+      "Status",
+    ];
+    const tableRows = [];
+
+    data.forEach((item) => {
+      tableRows.push([
+        item.SNo,
+        item.ResourceName,
+        item.Tasks,
+        item.TimeUtilized,
+        item.Status,
+      ]);
+    });
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      didParseCell: function (data) {
+        // Apply bold to Time Utilized column for totalTime rows
+        if (data.column.index === 3 && data.row.raw[2] === "") {
+          data.cell.styles.fontStyle = "bold"; // Make it bold
+          data.cell.styles.textColor = [0, 123, 255]; // Optional: Set color
+        }
+      },
+    });
+
+    doc.save("formatted_tasks.pdf");
+  };
+
   return (
     <div style={{ padding: "20px" }}>
       <h1>Excel Formatter</h1>
@@ -157,6 +197,14 @@ function App() {
       {data.length > 0 && (
         <div>
           <h2>Data Preview</h2>
+          <div style={styles.buttonHead}>
+            <button style={styles.button} onClick={exportToExcel}>
+              Download Excel
+            </button>
+            <button style={styles.button} onClick={exportToPDF}>
+              Download PDF
+            </button>
+          </div>
           <table border="1">
             <thead>
               <tr>
@@ -181,16 +229,21 @@ function App() {
                         : item.ResourceName}
                     </td>
                     <td>{item.Tasks}</td>
-                    <td>{item.TimeUtilized}</td>
+                    <td>
+                      {item.Tasks === "" ? (
+                        <span style={{ fontWeight: "bold", color: "#007bff" }}>
+                          {item.TimeUtilized}
+                        </span>
+                      ) : (
+                        item.TimeUtilized
+                      )}
+                    </td>
                     <td>{item.Status}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          <button style={styles.button} onClick={exportToExcel}>
-            Download
-          </button>
         </div>
       )}
     </div>
@@ -199,9 +252,9 @@ function App() {
 
 const styles = {
   button: {
-    display: "block",
-    margin: "20px auto",
-    padding: "10px 20px",
+    // display: "block",
+    margin: "10px",
+    padding: "10px 10px",
     fontSize: "1.2rem",
     fontWeight: "bold",
     color: "#fff",
@@ -210,6 +263,10 @@ const styles = {
     borderRadius: "5px",
     cursor: "pointer",
     transition: "background-color 0.3s ease",
+  },
+  buttonHead: {
+    display: "flex",
+    justifyContent: "end",
   },
 };
 
