@@ -32,9 +32,9 @@ const AttendanceFormatter = () => {
       return employee;
     });
 
-    console.log("employeeData", employeeData);
+    console.log("Employee data", employeeData);
 
-    const updatedEmployees = employeeData.map((emp) => {
+    const updatedEmployees = employeeData.map((emp, index) => {
       // Initialize counters
       let presentDays = 0;
       let halfDays = 0;
@@ -60,27 +60,43 @@ const AttendanceFormatter = () => {
       // Convert half-days to casual leave (2 half-days = 1 casual leave)
       casualLeave += Math.floor(halfDays / 2);
 
+      // Deduct salary for excess casual leave
+      let clDeduction = 0;
+      if (casualLeave > emp["Balance CL"]) {
+        const excessCL = casualLeave - emp["Balance CL"]; // Calculate excess casual leave
+        const dailySalary = emp["Gross Salary"] / emp["Month Days"]; // Calculate daily salary
+        clDeduction = excessCL * dailySalary; // Deduction for excess casual leave
+      }
+
+      // Deduct salary for excess sick leave
+      let slDeduction = 0;
+
+      if (sickLeave > emp["Balance SL"]) {
+        const excessSL = sickLeave - emp["Balance SL"]; // Calculate excess sick leave
+        const dailySalary = emp["Gross Salary"] / emp["Month Days"]; // Calculate daily salary
+        slDeduction = excessSL * dailySalary; // Deduction for excess sick leave
+      }
+
       // Deduct salary for any remaining single half-day
       let halfDayDeduction = 0;
       if (halfDays % 2 === 1) {
-        const totalWorkingDays = 22; // Adjust this based on your month
-        const dailySalary = emp["Gross Salary"] / totalWorkingDays;
+        const dailySalary = emp["Gross Salary"] / emp["Month Days"];
         halfDayDeduction = dailySalary / 2; // Deduction for a single half-day
       }
 
-      // Calculate total combined leave (casual + sick)
-      const totalLeave = casualLeave + sickLeave;
+      // // Calculate total combined leave (casual + sick)
+      // const totalLeave = casualLeave + sickLeave;
 
-      // Determine excess leave only if the total combined leave exceeds 2
-      let excessLeave = 0;
-      if (totalLeave > 2) {
-        excessLeave = totalLeave - 2; // Only the excess amount beyond 2
-      }
+      // // Determine excess leave only if the total combined leave exceeds 2
+      // let excessLeave = 0;
+      // if (totalLeave > 2) {
+      //   excessLeave = totalLeave - 2; // Only the excess amount beyond 2
+      // }
 
-      // Total working days in the month
-      const totalWorkingDays = 22; // Assuming 22 working days in the month
-      const dailySalary = emp["Gross Salary"] / totalWorkingDays;
-      const leaveDeduction = excessLeave * dailySalary; // Deduct salary for excess leave
+      // // Total working days in the month
+      const totalWorkingDays = emp["Month Days"]; // Assuming provided workdays
+      const dailySalary = emp["Gross Salary"] / totalWorkingDays; //1521
+      // const leaveDeduction = excessLeave * dailySalary; // Deduct salary for excess leave
 
       // Check if present days exceed total working days and calculate additional salary
       let additionalSalary = 0;
@@ -94,30 +110,31 @@ const AttendanceFormatter = () => {
       const netSalary =
         emp["Gross Salary"] -
         emp["Dedection"] -
-        leaveDeduction -
+        clDeduction - // Deduction for excess casual leave
+        slDeduction - // Deduction for excess sick leave
         halfDayDeduction +
         additionalSalary;
 
       return {
+        SNo: index + 1,
         Name: emp["Employee Names"],
+        DaysPresent: presentDays,
+        HalfDayCount: halfDays,
+        OTinDays: extraDays ?? "-",
+        SickLeavesTaken: sickLeave,
+        CasualLeavesTaken: casualLeave,
+        ExcessCL:
+          casualLeave > emp["Balance CL"] ? casualLeave - emp["Balance CL"] : 0, // Track excess casual leave
+        ExcessSL:
+          sickLeave > emp["Balance SL"] ? sickLeave - emp["Balance SL"] : 0, // Track excess sick leave
         GrossSalary: emp["Gross Salary"],
-        PresentDays: presentDays,
-        HalfDays: halfDays,
-        ExtraDays: extraDays ?? "-",
-        TotalSickLeave: sickLeave,
-        TotalCasualLeave: casualLeave,
-        TotalLeave: totalLeave, // Combined total leave
-        ExcessLeave: excessLeave, // Only excess leave beyond 2
-        LeaveDeduction: Math.round(leaveDeduction), // Deduction based on excess leave
-        HalfDayDeduction: Math.round(halfDayDeduction), // Deduction for single half-day
-        AdditionalSalary: Math.round(additionalSalary), // Additional salary for extra days
+        Deduction: emp["Dedection"],
+        CL_LOP: Math.round(clDeduction), // Deduction for casual leave
+        SL_LOP: Math.round(slDeduction), // Deduction for sick leave
         NetSalary: Math.round(netSalary),
       };
     });
 
-    console.log("updatedEmployees", updatedEmployees);
-
-    // Filter out employees who might not have attendance data
     const filteredEmployees = updatedEmployees.filter(
       (emp) =>
         emp.PresentDays !== 0 ||
