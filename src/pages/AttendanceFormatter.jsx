@@ -145,7 +145,7 @@ const AttendanceFormatter = () => {
       <div className="flex row justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold font-serif pb-4 text-gray-800 border-b-2 border-gray-300 mb-4">
-            Attendance Formatter
+            Attendance Report
           </h1>
           <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} />
         </div>

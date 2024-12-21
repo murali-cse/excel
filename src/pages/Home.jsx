@@ -15,15 +15,21 @@ const Home = () => {
         {/* Buttons to navigate to different pages */}
         <button
           className="bg-blue-700 text-white mr-2 px-4 py-2 rounded"
-          onClick={() => navigate("/jira-formatter")}
+          onClick={() => navigate("/jira-daily-report")}
         >
-          Go to Jira Formatter
+          JIRA DAILY REPORT
+        </button>
+        <button
+          className="bg-blue-700 text-white mr-2 px-4 py-2 rounded"
+          onClick={() => navigate("/jira-time-report")}
+        >
+          JIRA TIME BASED REPORT
         </button>
         <button
           className="bg-blue-700 text-white px-4 py-2 rounded"
           onClick={() => navigate("/attendance-formatter")}
         >
-          Go to Attendance Formatter
+          ATTENDANCE REPORT
         </button>
       </div>
     </div>

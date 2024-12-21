@@ -216,7 +216,7 @@ function JiraFormatter() {
         <div>
           <div className="flex row items-center gap-2">
             <h1 className="text-3xl font-bold font-serif pb-4 text-gray-800 border-b-2 border-gray-300 mb-4">
-              Jira Formatter
+              Jira Daily Report
             </h1>
           </div>
           <input type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
